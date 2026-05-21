@@ -29,6 +29,8 @@ export * from './dialect';
 export * from './dialects/kysely-bun-sqlite/kysely-bun-sqlite-dialect';
 export * from './dialects/libsql/libsql-adapter';
 export * from './dialects/libsql/libsql-dialect';
+export * from './dialects/mssql/mssql-adapter';
+export * from './dialects/mssql/mssql-dialect';
 export * from './dialects/mysql/date-strings';
 export * from './dialects/mysql/mysql-adapter';
 export * from './dialects/mysql/mysql-dialect';
