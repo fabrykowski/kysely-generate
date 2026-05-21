@@ -22,6 +22,14 @@ const parseTableMetadata = (introspector: PostgresIntrospector) => {
   ).parseTableMetadata.bind(introspector);
 };
 
+const mergeTables = (introspector: PostgresIntrospector) => {
+  return (
+    introspector as unknown as {
+      mergeTables: (tables: unknown[], materializedViews: unknown[]) => unknown[];
+    }
+  ).mergeTables.bind(introspector);
+};
+
 const column = ({
   schema,
   table,
@@ -41,6 +49,16 @@ const column = ({
 });
 
 describe(PostgresIntrospector.name, () => {
+  test('keeps upstream table order when there are no materialized views', () => {
+    const introspector = new PostgresIntrospector();
+    const tables = [
+      { columns: [], isView: false, name: 'z', schema: 'public' },
+      { columns: [], isView: false, name: 'a', schema: 'public' },
+    ];
+
+    expect(mergeTables(introspector)(tables, [])).toBe(tables);
+  });
+
   test('marks materialized views as views', () => {
     const introspector = new PostgresIntrospector();
     const tables = parseTableMetadata(introspector)([
@@ -49,6 +67,7 @@ describe(PostgresIntrospector.name, () => {
 
     expect(tables).toHaveLength(1);
     expect(tables[0]).toMatchObject({
+      isForeign: false,
       isView: true,
       name: 'foo_bar_mv',
       schema: 'public',

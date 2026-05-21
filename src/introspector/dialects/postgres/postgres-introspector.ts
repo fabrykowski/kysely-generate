@@ -10,7 +10,6 @@ import { Introspector } from '../../introspector';
 import type { ColumnMetadata } from '../../metadata/column-metadata';
 import { DatabaseMetadata } from '../../metadata/database-metadata';
 import type { TableMetadata } from '../../metadata/table-metadata';
-import { TableMatcher } from '../../table-matcher';
 import type { PostgresDB } from './postgres-db';
 
 export type PostgresDomainInspector = {
@@ -43,6 +42,10 @@ type PostgresRawColumnMetadata = {
   type_schema: string;
 };
 
+type PostgresTableMetadata = KyselyTableMetadata & {
+  isForeign: false;
+};
+
 export class PostgresIntrospector extends Introspector<PostgresDB> {
   protected readonly options: PostgresIntrospectorOptions;
 
@@ -67,21 +70,7 @@ export class PostgresIntrospector extends Introspector<PostgresDB> {
 
     tables = this.mergeTables(tables, materializedViews);
 
-    if (options.includePattern) {
-      const tableMatcher = new TableMatcher(options.includePattern);
-      tables = tables.filter(({ name, schema }) =>
-        tableMatcher.match(schema, name),
-      );
-    }
-
-    if (options.excludePattern) {
-      const tableMatcher = new TableMatcher(options.excludePattern);
-      tables = tables.filter(
-        ({ name, schema }) => !tableMatcher.match(schema, name),
-      );
-    }
-
-    return tables;
+    return this.filterTables(tables, options);
   }
 
   private async getMaterializedViews(db: Kysely<PostgresDB>) {
@@ -123,6 +112,14 @@ export class PostgresIntrospector extends Introspector<PostgresDB> {
     tables: KyselyTableMetadata[],
     materializedViews: KyselyTableMetadata[],
   ) {
+    if (materializedViews.length === 0) {
+      return tables;
+    }
+
+    if (tables.length === 0) {
+      return materializedViews;
+    }
+
     const mergedTables = new Map<string, KyselyTableMetadata>();
 
     for (const table of [...tables, ...materializedViews]) {
@@ -145,7 +142,7 @@ export class PostgresIntrospector extends Introspector<PostgresDB> {
   }
 
   private parseTableMetadata(columns: PostgresRawColumnMetadata[]) {
-    const tables = new Map<string, KyselyTableMetadata>();
+    const tables = new Map<string, PostgresTableMetadata>();
 
     for (const column of columns) {
       const key = `${column.schema}\0${column.table}`;
@@ -154,6 +151,7 @@ export class PostgresIntrospector extends Introspector<PostgresDB> {
       if (!table) {
         table = {
           columns: [],
+          isForeign: false,
           isView: column.table_type === 'v' || column.table_type === 'm',
           name: column.table,
           schema: column.schema,
