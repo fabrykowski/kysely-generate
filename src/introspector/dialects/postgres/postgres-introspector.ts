@@ -3,18 +3,13 @@ import type {
   ColumnMetadata as KyselyColumnMetaData,
   TableMetadata as KyselyTableMetadata,
 } from 'kysely';
-import {
-  DEFAULT_MIGRATION_LOCK_TABLE,
-  DEFAULT_MIGRATION_TABLE,
-  sql,
-} from 'kysely';
+import { sql } from 'kysely';
 import { EnumCollection } from '../../enum-collection';
 import type { IntrospectOptions } from '../../introspector';
 import { Introspector } from '../../introspector';
 import type { ColumnMetadata } from '../../metadata/column-metadata';
 import { DatabaseMetadata } from '../../metadata/database-metadata';
 import type { TableMetadata } from '../../metadata/table-metadata';
-import { TableMatcher } from '../../table-matcher';
 import type { PostgresDB } from './postgres-db';
 
 export type PostgresDomainInspector = {
@@ -47,6 +42,10 @@ type PostgresRawColumnMetadata = {
   type_schema: string;
 };
 
+type PostgresTableMetadata = KyselyTableMetadata & {
+  isForeign: false;
+};
+
 export class PostgresIntrospector extends Introspector<PostgresDB> {
   protected readonly options: PostgresIntrospectorOptions;
 
@@ -64,8 +63,18 @@ export class PostgresIntrospector extends Introspector<PostgresDB> {
   }
 
   protected override async getTables(options: IntrospectOptions<PostgresDB>) {
+    let tables = await options.db.introspection.getTables();
+    const materializedViews = await this.getMaterializedViews(
+      options.db.withoutPlugins(),
+    );
+
+    tables = this.mergeTables(tables, materializedViews);
+
+    return this.filterTables(tables, options);
+  }
+
+  private async getMaterializedViews(db: Kysely<PostgresDB>) {
     // Kysely's built-in postgres introspector doesn't include materialized views (`relkind = 'm'`).
-    // Replicate its query and include them.
     const { rows } = await sql<PostgresRawColumnMetadata>`
       select
         a.attname as column,
@@ -86,39 +95,54 @@ export class PostgresIntrospector extends Introspector<PostgresDB> {
       inner join pg_catalog.pg_namespace as ns on c.relnamespace = ns.oid
       inner join pg_catalog.pg_type as typ on a.atttypid = typ.oid
       inner join pg_catalog.pg_namespace as dtns on typ.typnamespace = dtns.oid
-      where c.relkind in ('r', 'v', 'p', 'm')
+      where c.relkind = 'm'
         and ns.nspname !~ '^pg_'
         and ns.nspname != 'information_schema'
         and ns.nspname != 'crdb_internal'
         and has_schema_privilege(ns.nspname, 'USAGE')
         and a.attnum >= 0
         and a.attisdropped != true
-        and c.relname != ${DEFAULT_MIGRATION_TABLE}
-        and c.relname != ${DEFAULT_MIGRATION_LOCK_TABLE}
       order by ns.nspname, c.relname, a.attnum;
-    `.execute(options.db.withoutPlugins());
+    `.execute(db);
 
-    let tables = this.parseTableMetadata(rows);
+    return this.parseTableMetadata(rows);
+  }
 
-    if (options.includePattern) {
-      const tableMatcher = new TableMatcher(options.includePattern);
-      tables = tables.filter(({ name, schema }) =>
-        tableMatcher.match(schema, name),
-      );
+  private mergeTables(
+    tables: KyselyTableMetadata[],
+    materializedViews: KyselyTableMetadata[],
+  ) {
+    if (materializedViews.length === 0) {
+      return tables;
     }
 
-    if (options.excludePattern) {
-      const tableMatcher = new TableMatcher(options.excludePattern);
-      tables = tables.filter(
-        ({ name, schema }) => !tableMatcher.match(schema, name),
-      );
+    if (tables.length === 0) {
+      return materializedViews;
     }
 
-    return tables;
+    const mergedTables = new Map<string, KyselyTableMetadata>();
+
+    for (const table of [...tables, ...materializedViews]) {
+      const key = `${table.schema ?? ''}\0${table.name}`;
+      if (!mergedTables.has(key)) {
+        mergedTables.set(key, table);
+      }
+    }
+
+    return Array.from(mergedTables.values()).sort((left, right) => {
+      const schemaComparison = (left.schema ?? '').localeCompare(
+        right.schema ?? '',
+      );
+      if (schemaComparison !== 0) {
+        return schemaComparison;
+      }
+
+      return left.name.localeCompare(right.name);
+    });
   }
 
   private parseTableMetadata(columns: PostgresRawColumnMetadata[]) {
-    const tables = new Map<string, KyselyTableMetadata>();
+    const tables = new Map<string, PostgresTableMetadata>();
 
     for (const column of columns) {
       const key = `${column.schema}\0${column.table}`;
@@ -127,6 +151,7 @@ export class PostgresIntrospector extends Introspector<PostgresDB> {
       if (!table) {
         table = {
           columns: [],
+          isForeign: false,
           isView: column.table_type === 'v' || column.table_type === 'm',
           name: column.table,
           schema: column.schema,

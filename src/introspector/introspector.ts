@@ -1,4 +1,4 @@
-import { Kysely, sql } from 'kysely';
+import { Kysely, sql, type TableMetadata as KyselyTableMetadata } from 'kysely';
 import type { IntrospectorDialect } from './dialect';
 import type { DatabaseMetadata } from './metadata/database-metadata';
 import { TableMatcher } from './table-matcher';
@@ -59,8 +59,16 @@ export abstract class Introspector<DB> {
   }
 
   protected async getTables(options: IntrospectOptions<DB>) {
-    let tables = await options.db.introspection.getTables();
+    return this.filterTables(
+      await options.db.introspection.getTables(),
+      options,
+    );
+  }
 
+  protected filterTables(
+    tables: KyselyTableMetadata[],
+    options: IntrospectOptions<DB>,
+  ) {
     if (options.includePattern) {
       const tableMatcher = new TableMatcher(options.includePattern);
       tables = tables.filter(({ name, schema }) =>
