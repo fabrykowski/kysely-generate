@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "kysely-generate",
-  "version": "0.21.5",
+  "version": "0.21.6",
   "author": "VastBlast",
   "license": "MIT",
   "bin": {
@@ -32,7 +32,7 @@
     "chalk": "^5.6.2",
     "cosmiconfig": "^9.0.0",
     "dotenv": "^17.2.1",
-    "dotenv-expand": "^12.0.2",
+    "dotenv-expand": "^13.0.0",
     "git-diff": "^2.0.6",
     "micromatch": "^4.0.8",
     "minimist": "^1.2.8",
