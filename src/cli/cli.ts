@@ -53,6 +53,7 @@ export class Cli {
     const dialect = getDialect(dialectName, {
       dateParser: options.dateParser,
       dateStrings: options.dateStrings,
+      defaultSchemas: options.defaultSchemas,
       domains: options.domains,
       numericParser: options.numericParser,
       partitions: options.partitions,

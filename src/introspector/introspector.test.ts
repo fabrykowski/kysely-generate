@@ -7,6 +7,7 @@ import { IntrospectorDialect } from './dialect';
 import { LibsqlIntrospectorDialect } from './dialects/libsql/libsql-dialect';
 import { MysqlIntrospectorDialect } from './dialects/mysql/mysql-dialect';
 import { PostgresIntrospectorDialect } from './dialects/postgres/postgres-dialect';
+import { PostgresJSIntrospectorDialect } from './dialects/postgres-js/postgres-js-dialect';
 import { SqliteIntrospectorDialect } from './dialects/sqlite/sqlite-dialect';
 import { EnumCollection } from './enum-collection';
 import { Introspector } from './introspector';
@@ -61,6 +62,35 @@ const TESTS: Test[] = [
     },
   },
   {
+    connectionString: 'postgres://user:password@localhost:5433/database',
+    dialect: new PostgresJSIntrospectorDialect({
+      dateParser: 'string',
+      numericParser: 'number-or-string',
+    }),
+    inputValues: {
+      date: '2024-10-14',
+      enum: 'foo',
+      false: false,
+      id: 1,
+      interval1: '1 day',
+      interval2: '24 months',
+      numeric1: Number.MAX_SAFE_INTEGER,
+      numeric2: String(Number.MAX_SAFE_INTEGER + 1),
+      true: true,
+    },
+    outputValues: {
+      date: '2024-10-14',
+      enum: 'foo',
+      false: false,
+      id: 1,
+      interval1: '1 day',
+      interval2: '2 years',
+      numeric1: Number.MAX_SAFE_INTEGER,
+      numeric2: String(Number.MAX_SAFE_INTEGER + 1),
+      true: true,
+    },
+  },
+  {
     connectionString: ':memory:',
     dialect: new SqliteIntrospectorDialect(),
     inputValues: { false: 0, id: 1, true: 1 },
@@ -101,33 +131,33 @@ const testValues = async (
 };
 
 describe(Introspector.name, () => {
-  it('should destroy a failed SSL connection before retrying without SSL', async () => {
-    class TestIntrospector extends Introspector<any> {
-      override async introspect() {
-        return new DatabaseMetadata({ tables: [] });
-      }
+  class TestIntrospector extends Introspector<any> {
+    override async introspect() {
+      return new DatabaseMetadata({ tables: [] });
+    }
+  }
+
+  class TestDialect extends IntrospectorDialect {
+    constructor(
+      override readonly introspector: Introspector<any>,
+      readonly sslAttempts: boolean[],
+    ) {
+      super();
     }
 
-    class TestDialect extends IntrospectorDialect {
-      constructor(
-        override readonly introspector: Introspector<any>,
-        readonly sslAttempts: boolean[],
-      ) {
-        super();
-      }
+    override async createKyselyDialect(options: {
+      connectionString: string;
+      ssl?: boolean;
+    }): Promise<KyselyDialect> {
+      this.sslAttempts.push(options.ssl ?? false);
 
-      override async createKyselyDialect(options: {
-        connectionString: string;
-        ssl?: boolean;
-      }): Promise<KyselyDialect> {
-        this.sslAttempts.push(options.ssl ?? false);
-
-        return new SqliteDialect({
-          database: new Database(options.connectionString),
-        });
-      }
+      return new SqliteDialect({
+        database: new Database(options.connectionString),
+      });
     }
+  }
 
+  const assertRetryWithoutSsl = async (errorMessage: string) => {
     const introspector = new TestIntrospector();
     let connectionAttempts = 0;
 
@@ -135,7 +165,7 @@ describe(Introspector.name, () => {
       connectionAttempts++;
 
       if (connectionAttempts === 1) {
-        throw new Error('SSL is not enabled');
+        throw new Error(errorMessage);
       }
     };
 
@@ -156,6 +186,35 @@ describe(Introspector.name, () => {
       await db?.destroy();
       destroySpy.mockRestore();
     }
+  };
+
+  it('should destroy a failed SSL connection before retrying without SSL', async () => {
+    await assertRetryWithoutSsl('SSL is not enabled');
+  });
+
+  it('should retry without SSL after a TLS handshake failure', async () => {
+    await assertRetryWithoutSsl(
+      'Client network socket disconnected before secure TLS connection was established',
+    );
+  });
+
+  it('should not retry after non-SSL connection failures', async () => {
+    const introspector = new TestIntrospector();
+
+    (introspector as any).establishDatabaseConnection = async () => {
+      throw new Error('connect ECONNREFUSED 127.0.0.1:5432');
+    };
+
+    const sslAttempts: boolean[] = [];
+
+    await expect(
+      introspector.connect({
+        connectionString: ':memory:',
+        dialect: new TestDialect(introspector, sslAttempts),
+      }),
+    ).rejects.toThrow('connect ECONNREFUSED 127.0.0.1:5432');
+
+    expect(sslAttempts).toStrictEqual([true]);
   });
 
   it('should return the correct metadata for each dialect', async () => {

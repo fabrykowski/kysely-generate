@@ -3,6 +3,7 @@
 ## Changes in this fork:
 
 - PostgreSQL materialized view support (introspects materialized views alongside tables).
+- PostgreSQL generation through Postgres.js via `--dialect=postgres-js`.
 - MySQL dateStrings-aware typing for DATE/DATETIME/TIMESTAMP.
 - Added esm rather than just cjs build output.
   - Now uses tsdown to build both cjs and esm outputs.
@@ -36,6 +37,9 @@ You will also need to install Kysely with your driver of choice:
 ```sh
 # PostgreSQL
 npm install kysely pg
+
+# PostgreSQL with Postgres.js
+npm install kysely postgres kysely-postgres-js
 
 # MySQL
 npm install kysely mysql2
@@ -247,7 +251,9 @@ kysely-generate --default-schema=public --default-schema=hidden
 
 #### --dialect [value] <!-- omit from toc -->
 
-Set the SQL dialect. (values: `postgres`/`mysql`/`sqlite`/`mssql`/`libsql`/`bun-sqlite`/`kysely-bun-sqlite`/`worker-bun-sqlite`)
+Set the SQL dialect. (values: `postgres`/`postgres-js`/`mysql`/`sqlite`/`mssql`/`libsql`/`bun-sqlite`/`kysely-bun-sqlite`/`worker-bun-sqlite`)
+
+PostgreSQL URLs are inferred as `postgres`, which uses `pg`. If your application uses Postgres.js, set `--dialect=postgres-js` explicitly.
 
 #### --env-file [value] <!-- omit from toc -->
 

@@ -36,6 +36,8 @@ export * from './dialects/mysql/mysql-adapter';
 export * from './dialects/mysql/mysql-dialect';
 export * from './dialects/postgres/postgres-adapter';
 export * from './dialects/postgres/postgres-dialect';
+export * from './dialects/postgres-js/postgres-js-adapter';
+export * from './dialects/postgres-js/postgres-js-dialect';
 export * from './dialects/sqlite/sqlite-adapter';
 export * from './dialects/sqlite/sqlite-dialect';
 export * from './dialects/worker-bun-sqlite/worker-bun-sqlite-dialect';

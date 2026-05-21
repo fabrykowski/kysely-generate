@@ -21,7 +21,7 @@ import { RuntimeEnumDeclarationNode } from '../ast/runtime-enum-declaration-node
 import type { TemplateNode } from '../ast/template-node';
 import { UnionExpressionNode } from '../ast/union-expression-node';
 import type { GeneratorDialect } from '../dialect';
-import { PostgresDialect } from '../dialects/postgres/postgres-dialect';
+import { PostgresAdapter } from '../dialects/postgres/postgres-adapter';
 import type { RuntimeEnumsStyle } from '../generator/runtime-enums-style';
 import { toKyselyCamelCase } from '../utils/case-converter';
 import { GLOBAL_DEFINITIONS } from './definitions';
@@ -659,9 +659,14 @@ const getTableIdentifier = (
 
 const isPostgresRangeType = (dataType: string, context: TransformContext) => {
   return (
-    context.dialect.adapter.constructor.name === 'PostgresAdapter' &&
-    POSTGRES_RANGE_TYPES.has(dataType)
+    isPostgresDialect(context) && POSTGRES_RANGE_TYPES.has(dataType)
   );
+};
+
+const isPostgresDialect = (context: TransformContext) => {
+  // PostgreSQL driver variants share adapter semantics even when their
+  // connection dialect classes differ (`postgres` vs `postgres-js`).
+  return context.dialect.adapter instanceof PostgresAdapter;
 };
 
 const transformColumn = ({
@@ -678,7 +683,7 @@ const transformColumn = ({
     !!table.schema && context.defaultSchemas.includes(table.schema);
   const path = `${table.name}.${column.name}`;
   const override =
-    context.dialect instanceof PostgresDialect
+    isPostgresDialect(context)
       ? isDefaultSchema
         ? (overrides?.[`${table.schema}.${path}`] ?? overrides?.[path])
         : overrides?.[`${table.schema}.${path}`]

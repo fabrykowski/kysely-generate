@@ -15,6 +15,7 @@ export const LOG_LEVEL_NAMES = [
 
 export const VALID_DIALECTS = [
   'postgres',
+  'postgres-js',
   'mysql',
   'sqlite',
   'mssql',

@@ -52,6 +52,16 @@ describe(ConnectionStringParser.name, () => {
           dialect: 'postgres',
         },
       );
+      deepStrictEqual(
+        parser.parse({
+          connectionString: 'postgres://username:password@hostname/database',
+          dialect: 'postgres-js',
+        }),
+        {
+          connectionString: 'postgres://username:password@hostname/database',
+          dialect: 'postgres-js',
+        },
+      );
     });
   });
 

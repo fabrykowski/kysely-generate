@@ -22,6 +22,7 @@ import { LibsqlDialect } from '../dialects/libsql/libsql-dialect';
 import { MysqlDialect } from '../dialects/mysql/mysql-dialect';
 import type { PostgresDialectOptions } from '../dialects/postgres/postgres-dialect';
 import { PostgresDialect } from '../dialects/postgres/postgres-dialect';
+import { PostgresJSDialect } from '../dialects/postgres-js/postgres-js-dialect';
 import { SqliteDialect } from '../dialects/sqlite/sqlite-dialect';
 import { Logger } from '../logger/logger';
 import { toKyselyCamelCase } from '../utils/case-converter';
@@ -59,12 +60,26 @@ const TESTS: Test[] = [
   },
   {
     connectionString: 'postgres://user:password@localhost:5433/database',
+    dialect: new PostgresJSDialect(),
+    name: 'postgres-js',
+  },
+  {
+    connectionString: 'postgres://user:password@localhost:5433/database',
     dialect: new PostgresDialect({
       dateParser: 'string',
       numericParser: 'number-or-string',
     }),
     generateOptions: { runtimeEnums: 'screaming-snake-case' },
     name: 'postgres2',
+  },
+  {
+    connectionString: 'postgres://user:password@localhost:5433/database',
+    dialect: new PostgresJSDialect({
+      dateParser: 'string',
+      numericParser: 'number-or-string',
+    }),
+    generateOptions: { runtimeEnums: 'screaming-snake-case' },
+    name: 'postgres-js2',
   },
   {
     connectionString: ':memory:',

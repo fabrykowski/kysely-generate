@@ -10,6 +10,7 @@ import {
   type PostgresDialectOptions,
   PostgresDialect,
 } from './dialects/postgres/postgres-dialect';
+import { PostgresJSDialect } from './dialects/postgres-js/postgres-js-dialect';
 import { SqliteDialect } from './dialects/sqlite/sqlite-dialect';
 import { WorkerBunSqliteDialect } from './dialects/worker-bun-sqlite/worker-bun-sqlite-dialect';
 
@@ -38,6 +39,8 @@ export const getDialect = (
       return new MysqlDialect({ dateStrings: options?.dateStrings });
     case 'postgres':
       return new PostgresDialect(options);
+    case 'postgres-js':
+      return new PostgresJSDialect(options);
     case 'bun-sqlite': // Legacy.
     case 'worker-bun-sqlite':
       return new WorkerBunSqliteDialect();

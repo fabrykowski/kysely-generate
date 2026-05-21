@@ -159,6 +159,33 @@ describe(Cli.name, () => {
   );
 
   it(
+    'should be able to connect through the CLI using Postgres.js',
+    async () => {
+      const db = await up();
+
+      try {
+        const output = await new Cli().run({
+          config: {
+            defaultSchemas: ['cli'],
+            dialect: 'postgres-js',
+            includePattern: 'cli.*',
+            logLevel: 'silent',
+            outFile: null,
+            url: CONNECTION_STRING,
+          },
+        });
+
+        expect(output).toContain('export type Status');
+        expect(output).toContain('export interface Bacchi');
+        expect(output).toContain('export interface DB');
+      } finally {
+        await down(db);
+      }
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
     'should be able to supply a custom serializer to the config',
     async () => {
       const db = await up();
@@ -432,6 +459,7 @@ describe(Cli.name, () => {
       defaultSchemas: ['foo', 'bar'],
     });
     assert(['--dialect=mysql'], { dialect: 'mysql' });
+    assert(['--dialect=postgres-js'], { dialect: 'postgres-js' });
     assert(['--domains'], { domains: true });
     assert(['--exclude-pattern=public._*'], { excludePattern: 'public._*' });
     assert(['--help'], {});
@@ -494,7 +522,7 @@ describe(Cli.name, () => {
     );
     assert(
       ['--dialect=bogus'],
-      "Parameter '--dialect' must have one of the following values: postgres, mysql, sqlite, mssql, libsql, bun-sqlite, kysely-bun-sqlite, worker-bun-sqlite",
+      "Parameter '--dialect' must have one of the following values: postgres, postgres-js, mysql, sqlite, mssql, libsql, bun-sqlite, kysely-bun-sqlite, worker-bun-sqlite",
     );
     assert(
       ['--log-level=bogus'],
@@ -557,7 +585,7 @@ describe(Cli.name, () => {
     );
     assert(
       { dialect: 'sqlite3' },
-      'Invalid option: expected one of "bun-sqlite"|"kysely-bun-sqlite"|"libsql"|"mssql"|"mysql"|"postgres"|"sqlite"|"worker-bun-sqlite"',
+      'Invalid option: expected one of "bun-sqlite"|"kysely-bun-sqlite"|"libsql"|"mssql"|"mysql"|"postgres"|"postgres-js"|"sqlite"|"worker-bun-sqlite"',
     );
     assert(
       { domains: 'true' },
