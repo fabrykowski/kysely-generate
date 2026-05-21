@@ -1,4 +1,7 @@
-import { PostgresDialect as KyselyPostgresDialect } from 'kysely';
+import {
+  type Dialect as KyselyDialect,
+  PostgresDialect as KyselyPostgresDialect,
+} from 'kysely';
 import type { CreateKyselyDialectOptions } from '../../dialect';
 import { IntrospectorDialect } from '../../dialect';
 import type { DateParser } from './date-parser';
@@ -35,7 +38,9 @@ export class PostgresIntrospectorDialect extends IntrospectorDialect {
     };
   }
 
-  async createKyselyDialect(options: CreateKyselyDialectOptions) {
+  async createKyselyDialect(
+    options: CreateKyselyDialectOptions,
+  ): Promise<KyselyDialect> {
     const { default: pg } = await import('pg');
 
     if (this.options.dateParser === 'string') {

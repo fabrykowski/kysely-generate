@@ -26,6 +26,7 @@ export abstract class Introspector<DB> {
   async connect(options: ConnectOptions) {
     // Insane solution in lieu of a better one.
     // We'll create a database connection with SSL, and if it complains about SSL, try without it.
+    // Ordinary connection failures should still surface unchanged.
     for (const ssl of [true, false]) {
       let db: Kysely<DB> | undefined;
 
@@ -45,11 +46,12 @@ export abstract class Introspector<DB> {
           await db?.destroy();
         } catch {}
 
-        const isSslError =
-          error instanceof Error && /\bSSL\b/.test(error.message);
-        const isUnexpectedError = !ssl || !isSslError;
-
-        if (isUnexpectedError) {
+        // Postgres.js reports non-SSL servers as TLS handshake failures.
+        if (
+          !ssl ||
+          !(error instanceof Error) ||
+          !/\b(?:SSL|TLS)\b/i.test(error.message)
+        ) {
           throw error;
         }
       }
