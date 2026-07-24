@@ -6,13 +6,11 @@ services:
     image: adminer
     ports:
       - 8081:8080
-    restart: always
   kysely_codegen_libsql:
     container_name: kysely_codegen_libsql
     image: ghcr.io/libsql/sqld:latest
     ports:
       - 8080:8080
-    restart: always
   kysely_codegen_mysql:
     container_name: kysely_codegen_mysql
     environment:
@@ -23,7 +21,6 @@ services:
     image: mysql:latest
     ports:
       - 3306:3306
-    restart: always
   kysely_codegen_postgres:
     container_name: kysely_codegen_postgres
     environment:
@@ -33,4 +30,3 @@ services:
     image: postgres:latest
     ports:
       - 5433:5432
-    restart: always
