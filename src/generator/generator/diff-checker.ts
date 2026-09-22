@@ -1,4 +1,4 @@
-import gitDiff from 'git-diff';
+import { diffLines } from 'diff';
 
 export class DiffChecker {
   #sanitize(string: string) {
@@ -7,10 +7,20 @@ export class DiffChecker {
   }
 
   diff(oldTypes: string, newTypes: string) {
-    // Force the JS implementation to avoid environment-specific differences
-    // (e.g. whether `git` is available / repo detection / shell utilities).
-    return gitDiff(this.#sanitize(oldTypes), this.#sanitize(newTypes), {
-      forceFake: true,
-    });
+    const changes = diffLines(
+      this.#sanitize(oldTypes),
+      this.#sanitize(newTypes),
+    );
+
+    if (!changes.some((change) => change.added || change.removed)) {
+      return undefined;
+    }
+
+    return changes
+      .map(({ added, removed, value }) => {
+        const prefix = added ? '+' : removed ? '-' : ' ';
+        return prefix + value.replace(/\n(?!$)/g, `\n${prefix}`);
+      })
+      .join('');
   }
 }

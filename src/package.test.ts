@@ -1,4 +1,4 @@
-import { execa } from 'execa';
+import { exec, execFile } from 'node:child_process';
 import {
   copyFile,
   cp,
@@ -8,14 +8,16 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { join } from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { promisify } from 'node:util';
+import { beforeAll, describe, it } from 'vitest';
 
+const execFileAsync = promisify(execFile);
 const ROOT = process.cwd();
 const TEST_TIMEOUT = 60_000;
 
 describe('package', () => {
   beforeAll(async () => {
-    await execa`npm run build`;
+    await promisify(exec)('npm run build');
   }, TEST_TIMEOUT);
 
   it(
@@ -47,7 +49,7 @@ describe('package', () => {
             type: 'module',
           }),
         );
-        await execa(
+        await execFileAsync(
           process.execPath,
           [
             '--input-type=module',
@@ -121,27 +123,18 @@ describe('package', () => {
         );
 
         for (const project of ['tsconfig.json', 'tsconfig-db.json']) {
-          const result = await execa(
-            process.execPath,
-            [
-              join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc'),
-              '--project',
-              join(consumerDirectory, project),
-            ],
-            { reject: false },
-          );
-
-          expect(
-            result.exitCode,
-            result.stdout || result.stderr || JSON.stringify(result),
-          ).toBe(0);
+          await execFileAsync(process.execPath, [
+            join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc'),
+            '--project',
+            join(consumerDirectory, project),
+          ]);
         }
-        await execa(
+        await execFileAsync(
           process.execPath,
           ['--input-type=module', '--eval', "await import('kysely-generate')"],
           { cwd: consumerDirectory },
         );
-        await execa(
+        await execFileAsync(
           process.execPath,
           ['--eval', "require('kysely-generate')"],
           {

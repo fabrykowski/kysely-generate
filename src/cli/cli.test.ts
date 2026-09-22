@@ -1,8 +1,9 @@
-import { execa, ExecaError } from 'execa';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { deepStrictEqual } from 'node:assert';
+import { exec, execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { Pool } from 'pg';
 import { dedent } from 'ts-dedent';
 import packageJson from '../../package.json';
@@ -13,6 +14,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { migrate } from '../introspector/introspector.fixtures';
 import { PostgresIntrospectorDialect } from '../introspector/dialects/postgres/postgres-dialect';
 
+const execFileAsync = promisify(execFile);
 const BINARY_PATH = join(process.cwd(), packageJson.bin['kysely-generate']);
 const OUTPUT_PATH = join(__dirname, 'test', 'output.snapshot.ts');
 const CONNECTION_STRING = 'postgres://user:password@localhost:5433/database';
@@ -88,16 +90,17 @@ const up = async () => {
 
 describe(Cli.name, () => {
   beforeAll(async () => {
-    await execa`npm run build`;
+    await promisify(exec)('npm run build');
   }, TEST_TIMEOUT);
 
   it(
     'should be able to start the CLI',
     async () => {
-      const output = await execa`node ${BINARY_PATH} --help`.then(
-        (r) => r.stdout,
-      );
-      deepStrictEqual(output.includes('--help, -h'), true);
+      const { stdout } = await execFileAsync(process.execPath, [
+        BINARY_PATH,
+        '--help',
+      ]);
+      deepStrictEqual(stdout.includes('--help, -h'), true);
     },
     TEST_TIMEOUT,
   );
@@ -252,12 +255,17 @@ describe(Cli.name, () => {
   it(
     'should print large generated outputs completely',
     async () => {
-      const { stdout } =
-        await execa`node ${BINARY_PATH} --config-file ./src/cli/test/config-with-large-serializer.cjs`;
+      const { stdout } = await execFileAsync(
+        process.execPath,
+        [
+          BINARY_PATH,
+          '--config-file',
+          './src/cli/test/config-with-large-serializer.cjs',
+        ],
+        { maxBuffer: 3_000_000 },
+      );
 
-      expect(stdout).toHaveLength(2_000_001);
-      expect(stdout[0]).toBe('\n');
-      expect(stdout.at(-1)).toBe('x');
+      expect(stdout).toBe(`\n${'x'.repeat(2_000_000)}\n`);
     },
     TEST_TIMEOUT,
   );
@@ -281,7 +289,14 @@ describe(Cli.name, () => {
     async () => {
       const db = await up();
       await fs.writeFile(OUTPUT_PATH, OUTPUT);
-      await execa`node ${BINARY_PATH} --config-file ./src/cli/test/config.cjs --out-file ${OUTPUT_PATH} --verify`;
+      await execFileAsync(process.execPath, [
+        BINARY_PATH,
+        '--config-file',
+        './src/cli/test/config.cjs',
+        '--out-file',
+        OUTPUT_PATH,
+        '--verify',
+      ]);
       await down(db);
     },
     TEST_TIMEOUT,
@@ -424,20 +439,21 @@ describe(Cli.name, () => {
       const db = await up();
       const incorrectOutput = OUTPUT.replace('"CONFIRMED"', '"INVALID"');
       await fs.writeFile(OUTPUT_PATH, incorrectOutput);
-      let error: ExecaError | undefined;
-
-      try {
-        await execa`node ${BINARY_PATH} --config-file ./src/cli/test/config.cjs --out-file ${OUTPUT_PATH} --verify`;
-      } catch (caughtError) {
-        if (caughtError instanceof ExecaError) {
-          error = caughtError;
-        }
-      }
-
-      expect(error?.exitCode).toBe(1);
-      expect(error?.stderr).toContain(
-        "Generated types are not up-to-date! Use '--log-level=error' option to view the diff.",
-      );
+      await expect(
+        execFileAsync(process.execPath, [
+          BINARY_PATH,
+          '--config-file',
+          './src/cli/test/config.cjs',
+          '--out-file',
+          OUTPUT_PATH,
+          '--verify',
+        ]),
+      ).rejects.toMatchObject({
+        code: 1,
+        stderr: expect.stringContaining(
+          "Generated types are not up-to-date! Use '--log-level=error' option to view the diff.",
+        ),
+      });
 
       await down(db);
       await fs.writeFile(OUTPUT_PATH, OUTPUT);
