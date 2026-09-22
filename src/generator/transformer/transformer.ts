@@ -60,6 +60,7 @@ type TransformContext = {
   imports: Imports;
   metadata: DatabaseMetadata;
   overrides: Overrides | undefined;
+  reservedTypeNames: ReadonlySet<string>;
   runtimeEnums: boolean | RuntimeEnumsStyle;
   scalars: Scalars;
   symbols: SymbolCollection;
@@ -96,7 +97,6 @@ const POSTGRES_RANGE_TYPES = new Set([
 ]);
 
 const DATABASE_TYPE_NAME = 'DB';
-const RESERVED_DATABASE_TYPE_NAMES = new Set([DATABASE_TYPE_NAME]);
 
 const getOwn = <T>(
   record: Record<string, T | undefined> | undefined,
@@ -542,6 +542,16 @@ const createContext = (options: TransformOptions): TransformContext => {
     }
   }
 
+  const definitions = {
+    ...GLOBAL_DEFINITIONS,
+    ...options.dialect.adapter.definitions,
+  };
+  const imports = {
+    ...GLOBAL_IMPORTS,
+    ...options.dialect.adapter.imports,
+    ...customImportNodes,
+  };
+
   return {
     camelCase: !!options.camelCase,
     customImports: options.customImports,
@@ -551,19 +561,18 @@ const createContext = (options: TransformOptions): TransformContext => {
       options.defaultSchemas && options.defaultSchemas.length > 0
         ? options.defaultSchemas
         : options.dialect.adapter.defaultSchemas,
-    definitions: {
-      ...GLOBAL_DEFINITIONS,
-      ...options.dialect.adapter.definitions,
-    },
+    definitions,
     dialect: options.dialect,
     enums: options.metadata.enums,
-    imports: {
-      ...GLOBAL_IMPORTS,
-      ...options.dialect.adapter.imports,
-      ...customImportNodes,
-    },
+    imports,
     metadata: options.metadata,
     overrides: options.overrides,
+    // References to helpers and imports retain their original names.
+    reservedTypeNames: new Set([
+      DATABASE_TYPE_NAME,
+      ...Object.keys(definitions),
+      ...Object.keys(imports),
+    ]),
     runtimeEnums: options.runtimeEnums ?? false,
     scalars: {
       ...options.dialect.adapter.scalars,
@@ -811,7 +820,7 @@ const transformColumnToArgs = (
       symbol.node.id.name = context.symbols.set(
         symbolId,
         symbol,
-        RESERVED_DATABASE_TYPE_NAMES,
+        context.reservedTypeNames,
       );
       const node = new IdentifierNode(symbol.node.id.name);
       return [node];
@@ -823,7 +832,7 @@ const transformColumnToArgs = (
         node: unionize(transformEnum(enumValues)),
         type: 'Definition',
       },
-      RESERVED_DATABASE_TYPE_NAMES,
+      context.reservedTypeNames,
     );
     const node = new IdentifierNode(symbolName);
     return [node];

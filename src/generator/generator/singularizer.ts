@@ -35,13 +35,7 @@ const addSingularizationRules = (
 };
 
 const importPluralize = () => {
-  const moduleId = Object.values(require.cache).find((module) => {
-    return module?.filename?.includes('pluralize');
-  })?.id;
-
-  if (moduleId) {
-    delete require.cache[moduleId];
-  }
+  delete require.cache[require.resolve('pluralize')];
 
   return require('pluralize') as typeof import('pluralize');
 };

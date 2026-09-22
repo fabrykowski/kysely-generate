@@ -1,4 +1,4 @@
-import { strictEqual } from 'node:assert';
+import { match, strictEqual } from 'node:assert';
 import { EnumCollection } from '../../introspector/enum-collection';
 import { ColumnMetadata } from '../../introspector/metadata/column-metadata';
 import { DatabaseMetadata } from '../../introspector/metadata/database-metadata';
@@ -496,6 +496,50 @@ describe(TypeScriptSerializer.name, () => {
   });
 
   describe(TypeScriptSerializer.prototype.serializeFile.name, () => {
+    it.each([false, true])(
+      'should preserve helper and import names when enums collide (runtimeEnums: %s)',
+      (runtimeEnums) => {
+        const output = new TypeScriptSerializer({ runtimeEnums }).serializeFile(
+          new DatabaseMetadata({
+            enums: new EnumCollection({
+              'public.generated': ['one'],
+              'public.column_type': ['two'],
+              'public.status': ['three'],
+            }),
+            tables: [
+              {
+                name: 'events',
+                schema: 'public',
+                columns: [
+                  { name: 'two', dataType: 'column_type' },
+                  {
+                    name: 'one',
+                    dataType: 'generated',
+                    hasDefaultValue: true,
+                  },
+                  { name: 'three', dataType: 'status' },
+                  { name: 'external', dataType: 'text' },
+                ],
+              },
+            ],
+          }),
+          new PostgresDialect(),
+          {
+            customImports: { Status: './types' },
+            overrides: { columns: { 'events.external': 'Status' } },
+          },
+        );
+
+        match(output, /import type \{ ColumnType \} from "kysely";/);
+        match(output, /import type \{ Status \} from "\.\/types";/);
+        match(output, /export type Generated<T> = T extends ColumnType</);
+        match(output, /one: Generated<Generated2>;/);
+        match(output, /two: ColumnType2;/);
+        match(output, /three: Status2;/);
+        match(output, /external: Status;/);
+      },
+    );
+
     it('should serialize custom imports properly', () => {
       const dialect = new PostgresDialect();
       const metadata = new DatabaseMetadata({

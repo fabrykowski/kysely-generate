@@ -160,6 +160,8 @@ describe(ConnectionStringParser.name, () => {
     it.each([
       'libsql-data.sqlite',
       'mysql-data.sqlite',
+      'pg',
+      'PG',
       'pg-data.sqlite',
       'postgres.db',
     ])('does not infer a URL dialect from the filename %s', (connectionString) => {

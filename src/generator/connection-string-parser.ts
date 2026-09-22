@@ -128,7 +128,7 @@ export class ConnectionStringParser {
     const normalizedProtocol = protocol.toLowerCase();
     let normalizedConnectionString = connectionString;
 
-    if (normalizedProtocol === 'pg') {
+    if (normalizedProtocol === 'pg' && tail.startsWith(':')) {
       normalizedConnectionString = `postgres${tail}`;
     } else if (
       normalizedProtocol === 'sqlite' &&

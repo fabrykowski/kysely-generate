@@ -2,6 +2,18 @@ import { describe, expect, test } from 'vitest';
 import { createSingularizer } from './singularizer';
 
 describe(createSingularizer.name, () => {
+  test('isolates custom rules when package metadata is cached', () => {
+    const original = createSingularizer();
+    require('pluralize/package.json');
+
+    const custom = createSingularizer({ users: 'person' });
+    const defaults = createSingularizer();
+
+    expect(custom('users')).toBe('person');
+    expect(defaults('users')).toBe('user');
+    expect(original('users')).toBe('user');
+  });
+
   test('rules array', () => {
     const singularize = createSingularizer([
       ['/^(.*?)s?$/', '$1_model'],

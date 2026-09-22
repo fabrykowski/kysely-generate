@@ -30,7 +30,8 @@ export class Cli {
 
   async generate(options: Config) {
     const connectionStringParser = new ConnectionStringParser();
-    const logger = options.logger ?? new Logger(options.logLevel);
+    const logger =
+      options.logger ?? new Logger(options.logLevel ?? DEFAULT_LOG_LEVEL);
 
     logger.debug('Options:');
     logger.debug({

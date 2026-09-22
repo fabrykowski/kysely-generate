@@ -199,12 +199,14 @@ export class PostgresIntrospector extends Introspector<PostgresDB> {
     arrays,
     domains,
     enums,
+    includePartitions = this.options.partitions,
     partitions,
     tables: rawTables,
   }: {
     arrays?: PostgresArrayInspector[];
     domains: PostgresDomainInspector[];
     enums: EnumCollection;
+    includePartitions?: boolean;
     partitions: TableReference[];
     tables: KyselyTableMetadata[];
   }) {
@@ -245,7 +247,7 @@ export class PostgresIntrospector extends Introspector<PostgresDB> {
         };
       })
       .filter((table) => {
-        return this.options.partitions ? true : !table.isPartition;
+        return includePartitions ? true : !table.isPartition;
       });
 
     return new DatabaseMetadata({ enums, tables });
@@ -351,6 +353,7 @@ export class PostgresIntrospector extends Introspector<PostgresDB> {
       arrays,
       domains,
       enums,
+      includePartitions: options.partitions,
       partitions,
       tables,
     });

@@ -1,5 +1,7 @@
+import type { Kysely } from 'kysely';
 import { describe, expect, test } from 'vitest';
 import { EnumCollection } from '../../enum-collection';
+import type { PostgresDB } from './postgres-db';
 import {
   type PostgresArrayInspector,
   type PostgresDomainInspector,
@@ -112,6 +114,54 @@ const inspectTypes = ({
 };
 
 describe(PostgresIntrospector.name, () => {
+  test.each([undefined, false, true])(
+    'honors per-call partition settings with constructor default %s',
+    async (partitions) => {
+      const tables = [
+        { columns: [], isView: false, name: 'events', schema: 'public' },
+        { columns: [], isView: false, name: 'events_2026', schema: 'public' },
+      ];
+
+      class FixtureIntrospector extends PostgresIntrospector {
+        protected override async getTables() {
+          return tables;
+        }
+
+        protected override async introspectArrays() {
+          return [];
+        }
+
+        override async introspectDomains() {
+          return [];
+        }
+
+        override async introspectEnums() {
+          return new EnumCollection();
+        }
+
+        override async introspectPartitions() {
+          return [{ name: 'events_2026', schema: 'public' }];
+        }
+      }
+
+      const introspector = new FixtureIntrospector({ partitions });
+      const db = {} as Kysely<PostgresDB>;
+
+      for (const includePartitions of [true, false, undefined]) {
+        const metadata = await introspector.introspect({
+          db,
+          partitions: includePartitions,
+        });
+
+        expect(metadata.tables.map((table) => table.name)).toEqual(
+          (includePartitions ?? partitions)
+            ? ['events', 'events_2026']
+            : ['events'],
+        );
+      }
+    },
+  );
+
   test('resolves catalog arrays without guessing from underscores', () => {
     const columns = inspectTypes({
       arrays: [
